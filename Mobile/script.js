@@ -1,8 +1,7 @@
 "use strict";
 
 /* =========================================================
-   PeerDrop - Mobile
-   P2P File Transfer con PeerJS
+   PEERDROP - MOBILE
    ========================================================= */
 
 const CHUNK_SIZE = 64 * 1024;
@@ -16,7 +15,7 @@ let connection = null;
 let selectedFile = null;
 let pendingPeerId = null;
 
-let incomingTransfers = {};
+let incomingTransfer = null;
 let receivedFiles = [];
 
 /* =========================================================
@@ -71,17 +70,17 @@ const modalConfirmBtn = document.getElementById("modalConfirmBtn");
    INICIO
    ========================================================= */
 
-document.addEventListener("DOMContentLoaded", initialize);
+document.addEventListener(
+    "DOMContentLoaded",
+    initialize
+);
 
 function initialize() {
     setupEvents();
 
-    pendingPeerId = getPeerIdFromHash();
+    pendingPeerId =
+        getPeerIdFromHash();
 
-    /*
-     * Si alguien abre /Mobile/ desde una PC,
-     * vuelve automáticamente a la versión principal.
-     */
     if (redirectForDevice()) {
         return;
     }
@@ -90,32 +89,38 @@ function initialize() {
 }
 
 /* =========================================================
-   DETECCIÓN DE DISPOSITIVO
+   DETECCIÓN
    ========================================================= */
 
 function isMobileDevice() {
     return (
-        /Android|iPhone|iPad|iPod|Windows Phone|webOS|BlackBerry/i
-            .test(navigator.userAgent)
-        || window.matchMedia("(max-width: 700px)").matches
+        /Android|iPhone|iPad|iPod|Windows Phone|webOS|BlackBerry/i.test(
+            navigator.userAgent
+        ) ||
+        window.matchMedia(
+            "(max-width: 700px)"
+        ).matches
     );
 }
 
 function redirectForDevice() {
-    const isMobile = isMobileDevice();
+    const mobile =
+        isMobileDevice();
 
-    const currentPath = window.location.pathname;
+    const path =
+        window.location.pathname;
 
     const isMobilePage =
-        currentPath === MOBILE_PATH ||
-        currentPath.startsWith(MOBILE_PATH);
+        path === MOBILE_PATH ||
+        path.startsWith(MOBILE_PATH);
 
-    /*
-     * Móvil en la página principal:
-     * mandarlo a /Mobile/
-     */
-    if (isMobile && !isMobilePage) {
-        const hash = window.location.hash || "";
+    if (
+        mobile &&
+        !isMobilePage
+    ) {
+        const hash =
+            window.location.hash ||
+            "";
 
         window.location.replace(
             `${window.location.origin}${MOBILE_PATH}${hash}`
@@ -124,12 +129,13 @@ function redirectForDevice() {
         return true;
     }
 
-    /*
-     * PC en /Mobile/:
-     * devolverlo a la página principal.
-     */
-    if (!isMobile && isMobilePage) {
-        const hash = window.location.hash || "";
+    if (
+        !mobile &&
+        isMobilePage
+    ) {
+        const hash =
+            window.location.hash ||
+            "";
 
         window.location.replace(
             `${window.location.origin}/${hash}`
@@ -147,76 +153,124 @@ function redirectForDevice() {
 
 function setupEvents() {
     if (connectForm) {
-        connectForm.addEventListener("submit", event => {
-            event.preventDefault();
+        connectForm.addEventListener(
+            "submit",
+            event => {
+                event.preventDefault();
 
-            const id = remoteIdInput.value
-                .trim()
-                .toUpperCase();
-
-            connectToPeer(id);
-        });
+                connectToPeer(
+                    remoteIdInput.value
+                        .trim()
+                        .toUpperCase()
+                );
+            }
+        );
     }
 
     if (copyLinkBtn) {
-        copyLinkBtn.addEventListener("click", copyShareLink);
+        copyLinkBtn.addEventListener(
+            "click",
+            copyShareLink
+        );
     }
 
     if (disconnectBtn) {
-        disconnectBtn.addEventListener("click", disconnect);
+        disconnectBtn.addEventListener(
+            "click",
+            disconnect
+        );
     }
 
-    if (selectFileBtn) {
-        selectFileBtn.addEventListener("click", () => {
-            fileInput.click();
-        });
+    if (
+        selectFileBtn &&
+        fileInput
+    ) {
+        selectFileBtn.addEventListener(
+            "click",
+            () => fileInput.click()
+        );
     }
 
     if (fileInput) {
-        fileInput.addEventListener("change", event => {
-            const file = event.target.files?.[0];
+        fileInput.addEventListener(
+            "change",
+            event => {
+                const file =
+                    event.target
+                        .files?.[0];
 
-            if (file) {
-                selectFile(file);
+                if (file) {
+                    selectFile(file);
+                }
             }
-        });
+        );
     }
 
     if (removeFileBtn) {
-        removeFileBtn.addEventListener("click", removeSelectedFile);
+        removeFileBtn.addEventListener(
+            "click",
+            removeSelectedFile
+        );
     }
 
     if (sendFileBtn) {
-        sendFileBtn.addEventListener("click", sendSelectedFile);
+        sendFileBtn.addEventListener(
+            "click",
+            sendSelectedFile
+        );
     }
 
     if (dropZone) {
-        dropZone.addEventListener("dragover", event => {
-            event.preventDefault();
-            dropZone.classList.add("drag-over");
-        });
+        dropZone.addEventListener(
+            "dragover",
+            event => {
+                event.preventDefault();
 
-        dropZone.addEventListener("dragleave", () => {
-            dropZone.classList.remove("drag-over");
-        });
-
-        dropZone.addEventListener("drop", event => {
-            event.preventDefault();
-
-            dropZone.classList.remove("drag-over");
-
-            const file = event.dataTransfer.files?.[0];
-
-            if (file) {
-                selectFile(file);
+                dropZone.classList.add(
+                    "drag-over"
+                );
             }
-        });
+        );
+
+        dropZone.addEventListener(
+            "dragleave",
+            () => {
+                dropZone.classList.remove(
+                    "drag-over"
+                );
+            }
+        );
+
+        dropZone.addEventListener(
+            "drop",
+            event => {
+                event.preventDefault();
+
+                dropZone.classList.remove(
+                    "drag-over"
+                );
+
+                const file =
+                    event.dataTransfer
+                        .files?.[0];
+
+                if (file) {
+                    selectFile(file);
+                }
+            }
+        );
     }
 
-    window.addEventListener("hashchange", handleHashChange);
+    window.addEventListener(
+        "hashchange",
+        handleHashChange
+    );
 
     if (modalCancelBtn) {
-        modalCancelBtn.addEventListener("click", closeModal);
+        modalCancelBtn.addEventListener(
+            "click",
+            closeModal
+        );
     }
 }
 
@@ -225,136 +279,163 @@ function setupEvents() {
    ========================================================= */
 
 function initializePeer() {
-    setStatus("connecting", "Conectando...");
+    setStatus(
+        "connecting",
+        "Conectando..."
+    );
 
-    const shortId = generateShortPeerId();
+    const shortId =
+        generateShortPeerId();
 
     try {
-        peer = new Peer(shortId, {
-            debug: 0
-        });
+        peer = new Peer(
+            shortId,
+            {
+                debug: 0
+            }
+        );
     } catch (error) {
-        console.error("Error creando Peer:", error);
+        console.error(error);
 
-        setStatus("error", "Error");
+        setStatus(
+            "error",
+            "Error"
+        );
 
         showModal(
             "⚠️",
-            "No se pudo iniciar PeerDrop",
-            "No fue posible iniciar la conexión P2P."
+            "Error",
+            "No se pudo iniciar PeerDrop."
         );
 
         return;
     }
 
-    peer.on("open", id => {
-        console.log("Peer móvil abierto:", id);
+    peer.on(
+        "open",
+        id => {
+            myIdDisplay.textContent =
+                id;
 
-        myIdDisplay.textContent = id;
+            if (shareLinkInput) {
+                shareLinkInput.value =
+                    generateShareLink(id);
+            }
 
-        shareLinkInput.value = generateShareLink(id);
+            if (copyLinkBtn) {
+                copyLinkBtn.disabled =
+                    false;
+            }
 
-        copyLinkBtn.disabled = false;
-
-        setStatus("connected", "Listo");
-
-        /*
-         * Si el usuario llegó mediante un enlace:
-         * https://peerdrop.dns.navy/Mobile/#ABC123
-         *
-         * esperamos a PeerJS antes de conectarnos.
-         */
-        if (pendingPeerId && !connection) {
-            const targetId = pendingPeerId;
-
-            pendingPeerId = null;
-
-            setTimeout(() => {
-                connectToPeer(targetId, true);
-            }, 100);
-        }
-    });
-
-    peer.on("connection", incomingConnection => {
-        console.log(
-            "Conexión entrante:",
-            incomingConnection.peer
-        );
-
-        if (connection) {
-            try {
-                incomingConnection.close();
-            } catch {}
-
-            return;
-        }
-
-        setupConnection(incomingConnection);
-    });
-
-    peer.on("error", error => {
-        console.error("PeerJS error:", error);
-
-        if (error.type === "unavailable-id") {
-            console.warn(
-                "ID ocupado. Generando otro..."
+            setStatus(
+                "connected",
+                "Listo"
             );
 
-            try {
-                peer.destroy();
-            } catch {}
+            if (
+                pendingPeerId &&
+                !connection
+            ) {
+                const target =
+                    pendingPeerId;
 
-            peer = null;
+                pendingPeerId =
+                    null;
 
-            setTimeout(() => {
-                initializePeer();
-            }, 150);
-
-            return;
+                setTimeout(
+                    () => {
+                        connectToPeer(
+                            target,
+                            true
+                        );
+                    },
+                    100
+                );
+            }
         }
+    );
 
-        if (error.type === "peer-unavailable") {
-            setStatus("error", "No encontrado");
+    peer.on(
+        "connection",
+        conn => {
+            if (connection) {
+                try {
+                    conn.close();
+                } catch {}
 
-            showModal(
-                "⚠️",
-                "Dispositivo no encontrado",
-                "No se pudo encontrar el código introducido."
+                return;
+            }
+
+            setupConnection(conn);
+        }
+    );
+
+    peer.on(
+        "error",
+        error => {
+            console.error(
+                "PeerJS:",
+                error
             );
 
-            return;
-        }
+            if (
+                error.type ===
+                "unavailable-id"
+            ) {
+                try {
+                    peer.destroy();
+                } catch {}
 
-        if (error.type === "network") {
-            setStatus("error", "Error de red");
+                peer = null;
 
-            showModal(
-                "⚠️",
-                "Error de conexión",
-                "No se pudo establecer la conexión."
+                setTimeout(
+                    initializePeer,
+                    150
+                );
+
+                return;
+            }
+
+            if (
+                error.type ===
+                "peer-unavailable"
+            ) {
+                setStatus(
+                    "error",
+                    "No encontrado"
+                );
+
+                showModal(
+                    "⚠️",
+                    "Dispositivo no encontrado",
+                    "No se encontró ese código."
+                );
+
+                return;
+            }
+
+            setStatus(
+                "error",
+                "Error"
             );
-
-            return;
         }
+    );
 
-        setStatus("error", "Error");
-    });
+    peer.on(
+        "disconnected",
+        () => {
+            if (!connection) {
+                setStatus(
+                    "connecting",
+                    "Reconectando..."
+                );
 
-    peer.on("disconnected", () => {
-        console.warn("Peer desconectado");
-
-        if (!connection) {
-            setStatus("connecting", "Reconectando...");
-
-            try {
-                peer.reconnect();
-            } catch {}
+                try {
+                    peer.reconnect();
+                } catch {}
+            }
         }
-    });
-
-    peer.on("close", () => {
-        console.log("Peer cerrado");
-    });
+    );
 }
 
 /* =========================================================
@@ -364,27 +445,36 @@ function initializePeer() {
 function generateShortPeerId() {
     let id = "";
 
-    for (let i = 0; i < PEER_ID_LENGTH; i++) {
-        const randomIndex =
-            Math.floor(Math.random() * characters.length);
-
-        id += characters[randomIndex];
+    for (
+        let i = 0;
+        i < PEER_ID_LENGTH;
+        i++
+    ) {
+        id += characters[
+            Math.floor(
+                Math.random() *
+                characters.length
+            )
+        ];
     }
 
     return id;
 }
 
 function getPeerIdFromHash() {
-    const hash = window.location.hash
-        .replace(/^#/, "")
-        .trim();
+    const hash =
+        window.location.hash
+            .replace(/^#/, "")
+            .trim();
 
     if (!hash) {
         return null;
     }
 
     try {
-        return decodeURIComponent(hash)
+        return decodeURIComponent(
+            hash
+        )
             .trim()
             .toUpperCase();
     } catch {
@@ -392,24 +482,27 @@ function getPeerIdFromHash() {
     }
 }
 
-/* =========================================================
-   LINK COMPARTIDO
-   ========================================================= */
-
 function generateShareLink(id) {
-    const url = new URL(window.location.href);
+    const url =
+        new URL(
+            window.location.href
+        );
 
-    /*
-     * En móvil queremos conservar /Mobile/
-     * y solamente cambiar el hash.
-     */
-    url.hash = encodeURIComponent(id);
+    url.hash =
+        encodeURIComponent(id);
 
     return url.toString();
 }
 
+/* =========================================================
+   COPIAR LINK
+   ========================================================= */
+
 async function copyShareLink() {
-    if (!shareLinkInput?.value) {
+    if (
+        !shareLinkInput ||
+        !shareLinkInput.value
+    ) {
         return;
     }
 
@@ -418,25 +511,31 @@ async function copyShareLink() {
             shareLinkInput.value
         );
 
-        const originalText =
+        const old =
             copyLinkBtn.textContent;
 
-        copyLinkBtn.textContent = "Copiado";
+        copyLinkBtn.textContent =
+            "Copiado";
 
-        setTimeout(() => {
-            copyLinkBtn.textContent =
-                originalText;
-        }, 1500);
+        setTimeout(
+            () => {
+                copyLinkBtn.textContent =
+                    old;
+            },
+            1500
+        );
 
     } catch {
         shareLinkInput.select();
 
-        document.execCommand("copy");
+        document.execCommand(
+            "copy"
+        );
 
         showModal(
             "✓",
-            "Enlace copiado",
-            "El enlace fue copiado al portapapeles."
+            "Copiado",
+            "El enlace fue copiado."
         );
     }
 }
@@ -445,18 +544,22 @@ async function copyShareLink() {
    CONEXIÓN
    ========================================================= */
 
-function connectToPeer(id, fromDirectLink = false) {
+function connectToPeer(
+    id,
+    fromDirectLink = false
+) {
     if (!id) {
         showModal(
             "⚠️",
             "Código vacío",
-            "Introduce el código del dispositivo."
+            "Introduce un código."
         );
 
         return;
     }
 
-    id = id.trim().toUpperCase();
+    id =
+        id.trim().toUpperCase();
 
     if (!peer) {
         pendingPeerId = id;
@@ -468,11 +571,14 @@ function connectToPeer(id, fromDirectLink = false) {
         return;
     }
 
-    if (id.length !== PEER_ID_LENGTH) {
+    if (
+        id.length !==
+        PEER_ID_LENGTH
+    ) {
         showModal(
             "⚠️",
             "Código inválido",
-            `El código debe tener ${PEER_ID_LENGTH} caracteres.`
+            "El código debe tener 6 caracteres."
         );
 
         return;
@@ -482,7 +588,7 @@ function connectToPeer(id, fromDirectLink = false) {
         showModal(
             "⚠️",
             "Código inválido",
-            "No puedes conectarte a tu propio dispositivo."
+            "No puedes conectarte contigo mismo."
         );
 
         return;
@@ -496,27 +602,33 @@ function connectToPeer(id, fromDirectLink = false) {
         connection = null;
     }
 
-    setStatus("connecting", "Conectando...");
+    setStatus(
+        "connecting",
+        "Conectando..."
+    );
 
-    connectionTarget.textContent =
-        `Conectando con ${id}...`;
+    if (connectionTarget) {
+        connectionTarget.textContent =
+            `Conectando con ${id}...`;
+    }
 
     try {
-        const newConnection = peer.connect(id, {
-            reliable: true
-        });
+        const conn =
+            peer.connect(
+                id,
+                {
+                    reliable: true
+                }
+            );
 
-        setupConnection(newConnection);
+        setupConnection(conn);
 
     } catch (error) {
         console.error(error);
 
-        setStatus("error", "Error");
-
-        showModal(
-            "⚠️",
-            "No se pudo conectar",
-            "Ocurrió un error al establecer la conexión."
+        setStatus(
+            "error",
+            "Error"
         );
     }
 }
@@ -524,88 +636,96 @@ function connectToPeer(id, fromDirectLink = false) {
 function setupConnection(conn) {
     connection = conn;
 
-    conn.on("open", () => {
-        console.log(
-            "Conexión abierta con:",
-            conn.peer
-        );
+    conn.on(
+        "open",
+        () => {
+            if (connectionTarget) {
+                connectionTarget.textContent =
+                    `Conectado con ${conn.peer}`;
+            }
 
-        connectionTarget.textContent =
-            `Conectado con ${conn.peer}`;
+            setStatus(
+                "connected",
+                "Conectado"
+            );
 
-        setStatus("connected", "Conectado");
+            if (connectionSection) {
+                connectionSection.classList.add(
+                    "hidden"
+                );
+            }
 
-        if (connectionSection) {
-            connectionSection.classList.add("hidden");
+            if (transferSection) {
+                transferSection.classList.remove(
+                    "hidden"
+                );
+            }
+
+            if (
+                window.location.hash
+            ) {
+                history.replaceState(
+                    null,
+                    "",
+                    window.location.pathname +
+                    window.location.search
+                );
+            }
         }
+    );
 
-        if (transferSection) {
-            transferSection.classList.remove("hidden");
+    conn.on(
+        "data",
+        handleIncomingData
+    );
+
+    conn.on(
+        "close",
+        () => {
+            connection = null;
+
+            setStatus(
+                "connected",
+                "Listo"
+            );
+
+            if (connectionSection) {
+                connectionSection.classList.remove(
+                    "hidden"
+                );
+            }
+
+            if (transferSection) {
+                transferSection.classList.add(
+                    "hidden"
+                );
+            }
+
+            if (connectionTarget) {
+                connectionTarget.textContent =
+                    "Sin conexión";
+            }
+
+            resetProgress();
         }
+    );
 
-        /*
-         * Eliminamos el hash una vez conectados.
-         */
-        if (window.location.hash) {
-            history.replaceState(
-                null,
-                "",
-                window.location.pathname +
-                window.location.search
+    conn.on(
+        "error",
+        error => {
+            console.error(
+                "Connection:",
+                error
+            );
+
+            connection = null;
+
+            setStatus(
+                "error",
+                "Error de conexión"
             );
         }
-    });
-
-    conn.on("data", handleIncomingData);
-
-    conn.on("close", () => {
-        console.log("Conexión cerrada");
-
-        connection = null;
-
-        setStatus("connected", "Listo");
-
-        if (connectionSection) {
-            connectionSection.classList.remove("hidden");
-        }
-
-        if (transferSection) {
-            transferSection.classList.add("hidden");
-        }
-
-        connectionTarget.textContent =
-            "Sin conexión";
-
-        resetProgress();
-
-        showModal(
-            "ℹ️",
-            "Conexión cerrada",
-            "La conexión con el otro dispositivo se cerró."
-        );
-    });
-
-    conn.on("error", error => {
-        console.error(
-            "Connection error:",
-            error
-        );
-
-        connection = null;
-
-        setStatus(
-            "error",
-            "Error de conexión"
-        );
-
-        if (connectionSection) {
-            connectionSection.classList.remove("hidden");
-        }
-
-        if (transferSection) {
-            transferSection.classList.add("hidden");
-        }
-    });
+    );
 }
 
 function disconnect() {
@@ -618,33 +738,46 @@ function disconnect() {
     connection = null;
 
     if (connectionSection) {
-        connectionSection.classList.remove("hidden");
+        connectionSection.classList.remove(
+            "hidden"
+        );
     }
 
     if (transferSection) {
-        transferSection.classList.add("hidden");
+        transferSection.classList.add(
+            "hidden"
+        );
     }
 
-    connectionTarget.textContent =
-        "Sin conexión";
+    if (connectionTarget) {
+        connectionTarget.textContent =
+            "Sin conexión";
+    }
 
-    setStatus("connected", "Listo");
+    setStatus(
+        "connected",
+        "Listo"
+    );
 
     resetProgress();
 }
 
 /* =========================================================
-   ENLACES DIRECTOS
+   HASH
    ========================================================= */
 
 function handleHashChange() {
-    const id = getPeerIdFromHash();
+    const id =
+        getPeerIdFromHash();
 
     if (!id) {
         return;
     }
 
-    if (!peer || !peer.open) {
+    if (
+        !peer ||
+        !peer.open
+    ) {
         pendingPeerId = id;
         return;
     }
@@ -655,24 +788,41 @@ function handleHashChange() {
 
     pendingPeerId = null;
 
-    connectToPeer(id, true);
+    connectToPeer(
+        id,
+        true
+    );
 }
 
 /* =========================================================
-   ARCHIVOS
+   SELECCIÓN
    ========================================================= */
 
 function selectFile(file) {
     selectedFile = file;
 
-    fileName.textContent = file.name;
+    if (fileName) {
+        fileName.textContent =
+            file.name;
+    }
 
-    fileSize.textContent =
-        formatFileSize(file.size);
+    if (fileSize) {
+        fileSize.textContent =
+            formatFileSize(
+                file.size
+            );
+    }
 
-    fileCard.classList.remove("hidden");
+    if (fileCard) {
+        fileCard.classList.remove(
+            "hidden"
+        );
+    }
 
-    sendFileBtn.disabled = !connection;
+    if (sendFileBtn) {
+        sendFileBtn.disabled =
+            !connection;
+    }
 }
 
 function removeSelectedFile() {
@@ -682,50 +832,68 @@ function removeSelectedFile() {
         fileInput.value = "";
     }
 
-    fileCard.classList.add("hidden");
+    if (fileCard) {
+        fileCard.classList.add(
+            "hidden"
+        );
+    }
 
-    sendFileBtn.disabled = true;
+    if (sendFileBtn) {
+        sendFileBtn.disabled =
+            true;
+    }
 }
+
+/* =========================================================
+   ENVÍO
+   ========================================================= */
 
 async function sendSelectedFile() {
     if (!selectedFile) {
         return;
     }
 
-    if (!connection || !connection.open) {
+    if (
+        !connection ||
+        !connection.open
+    ) {
         showModal(
             "⚠️",
             "Sin conexión",
-            "Primero debes conectarte con otro dispositivo."
+            "Primero conecta otro dispositivo."
         );
 
         return;
     }
 
-    const file = selectedFile;
+    const file =
+        selectedFile;
 
-    sendFileBtn.disabled = true;
-    removeFileBtn.disabled = true;
+    if (sendFileBtn) {
+        sendFileBtn.disabled =
+            true;
+    }
 
-    progressCard.classList.remove("hidden");
+    if (removeFileBtn) {
+        removeFileBtn.disabled =
+            true;
+    }
 
-    progressTitle.textContent =
-        `Enviando ${file.name}`;
-
-    progressStatus.textContent =
-        "Preparando archivo...";
-
-    progressPercent.textContent = "0%";
-    progressBar.style.width = "0%";
-    progressSpeed.textContent = "";
+    showProgress(
+        `Enviando ${file.name}`
+    );
 
     const totalChunks =
-        Math.ceil(file.size / CHUNK_SIZE);
+        Math.ceil(
+            file.size /
+            CHUNK_SIZE
+        );
 
     let offset = 0;
-    let chunkIndex = 0;
+    let index = 0;
 
-    const startTime = performance.now();
+    const startTime =
+        performance.now();
 
     try {
         connection.send({
@@ -738,54 +906,43 @@ async function sendSelectedFile() {
             totalChunks
         });
 
-        while (offset < file.size) {
-            const chunk = file.slice(
-                offset,
-                offset + CHUNK_SIZE
-            );
+        while (
+            offset <
+            file.size
+        ) {
+            const chunk =
+                file.slice(
+                    offset,
+                    offset +
+                    CHUNK_SIZE
+                );
 
             const buffer =
                 await chunk.arrayBuffer();
 
             connection.send({
                 type: "file-chunk",
-                index: chunkIndex,
+                index,
                 data: buffer
             });
 
-            offset += chunk.size;
-            chunkIndex++;
+            offset +=
+                chunk.size;
 
-            const percent =
-                file.size === 0
-                    ? 100
-                    : Math.round(
-                        (offset / file.size) * 100
-                    );
+            index++;
 
-            const elapsed =
-                (performance.now() -
-                    startTime) / 1000;
+            updateProgress(
+                offset,
+                file.size,
+                startTime
+            );
 
-            const speed =
-                elapsed > 0
-                    ? offset / elapsed
-                    : 0;
-
-            progressPercent.textContent =
-                `${percent}%`;
-
-            progressBar.style.width =
-                `${percent}%`;
-
-            progressStatus.textContent =
-                `${formatFileSize(offset)} / ${formatFileSize(file.size)}`;
-
-            progressSpeed.textContent =
-                `${formatFileSize(speed)}/s`;
-
-            await new Promise(resolve =>
-                setTimeout(resolve, 0)
+            await new Promise(
+                resolve =>
+                    setTimeout(
+                        resolve,
+                        0
+                    )
             );
         }
 
@@ -793,35 +950,38 @@ async function sendSelectedFile() {
             type: "file-end"
         });
 
-        progressPercent.textContent =
-            "100%";
-
-        progressBar.style.width =
-            "100%";
-
-        progressStatus.textContent =
-            "Archivo enviado";
-
-        progressSpeed.textContent = "";
+        setProgressText(
+            "Archivo enviado",
+            "100%"
+        );
 
     } catch (error) {
         console.error(
-            "Error enviando archivo:",
+            "Error enviando:",
             error
         );
 
-        progressStatus.textContent =
-            "Error al enviar el archivo";
+        setProgressText(
+            "Error al enviar",
+            "0%"
+        );
 
         showModal(
             "⚠️",
             "Error de transferencia",
-            "No se pudo completar el envío del archivo."
+            "No se pudo completar el envío."
         );
 
     } finally {
-        sendFileBtn.disabled = false;
-        removeFileBtn.disabled = false;
+        if (sendFileBtn) {
+            sendFileBtn.disabled =
+                false;
+        }
+
+        if (removeFileBtn) {
+            removeFileBtn.disabled =
+                false;
+        }
     }
 }
 
@@ -830,163 +990,155 @@ async function sendSelectedFile() {
    ========================================================= */
 
 function handleIncomingData(data) {
-    if (!data || typeof data !== "object") {
-        return;
-    }
-
-    if (data.type === "file-start") {
-        startIncomingFile(data);
-        return;
-    }
-
-    if (data.type === "file-chunk") {
-        receiveFileChunk(data);
-        return;
-    }
-
-    if (data.type === "file-end") {
-        finishIncomingFile();
-    }
-}
-
-function startIncomingFile(data) {
-    incomingTransfers = {
-        name: data.name || "archivo",
-        size: Number(data.size) || 0,
-        mime:
-            data.mime ||
-            "application/octet-stream",
-        totalChunks:
-            Number(data.totalChunks) || 0,
-        chunks: [],
-        receivedChunks: 0,
-        receivedBytes: 0,
-        startTime: performance.now()
-    };
-
-    progressCard.classList.remove("hidden");
-
-    progressTitle.textContent =
-        `Recibiendo ${incomingTransfers.name}`;
-
-    progressPercent.textContent =
-        "0%";
-
-    progressBar.style.width =
-        "0%";
-
-    progressStatus.textContent =
-        `0 B / ${formatFileSize(incomingTransfers.size)}`;
-
-    progressSpeed.textContent = "";
-}
-
-function receiveFileChunk(data) {
     if (
-        !incomingTransfers ||
-        !incomingTransfers.chunks
+        !data ||
+        typeof data !==
+            "object"
     ) {
         return;
     }
 
-    let chunk = data.data;
+    switch (data.type) {
+        case "file-start":
+            startIncomingFile(data);
+            break;
 
-    if (!(chunk instanceof ArrayBuffer)) {
-        if (chunk?.buffer instanceof ArrayBuffer) {
-            chunk = chunk.buffer;
+        case "file-chunk":
+            receiveFileChunk(data);
+            break;
+
+        case "file-end":
+            finishIncomingFile();
+            break;
+    }
+}
+
+function startIncomingFile(data) {
+    incomingTransfer = {
+        name:
+            data.name ||
+            "archivo",
+
+        size:
+            Number(data.size) ||
+            0,
+
+        mime:
+            data.mime ||
+            "application/octet-stream",
+
+        totalChunks:
+            Number(
+                data.totalChunks
+            ) || 0,
+
+        chunks: [],
+
+        receivedChunks: 0,
+
+        receivedBytes: 0,
+
+        startTime:
+            performance.now()
+    };
+
+    showProgress(
+        `Recibiendo ${incomingTransfer.name}`
+    );
+
+    setProgressText(
+        `0 B / ${formatFileSize(incomingTransfer.size)}`,
+        "0%"
+    );
+}
+
+function receiveFileChunk(data) {
+    if (
+        !incomingTransfer ||
+        !incomingTransfer.chunks
+    ) {
+        return;
+    }
+
+    let buffer =
+        data.data;
+
+    if (
+        !(buffer instanceof ArrayBuffer)
+    ) {
+        if (
+            buffer &&
+            buffer.buffer instanceof ArrayBuffer
+        ) {
+            buffer =
+                buffer.buffer;
         } else {
             return;
         }
     }
 
-    incomingTransfers.chunks[data.index] =
-        chunk;
+    incomingTransfer.chunks[
+        data.index
+    ] = buffer;
 
-    incomingTransfers.receivedChunks++;
+    incomingTransfer.receivedChunks++;
 
-    incomingTransfers.receivedBytes +=
-        chunk.byteLength || 0;
+    incomingTransfer.receivedBytes +=
+        buffer.byteLength || 0;
 
-    const percent =
-        incomingTransfers.size === 0
-            ? 100
-            : Math.round(
-                (
-                    incomingTransfers.receivedBytes /
-                    incomingTransfers.size
-                ) * 100
-            );
-
-    const elapsed =
-        (
-            performance.now() -
-            incomingTransfers.startTime
-        ) / 1000;
-
-    const speed =
-        elapsed > 0
-            ? incomingTransfers.receivedBytes /
-              elapsed
-            : 0;
-
-    progressPercent.textContent =
-        `${Math.min(percent, 100)}%`;
-
-    progressBar.style.width =
-        `${Math.min(percent, 100)}%`;
-
-    progressStatus.textContent =
-        `${formatFileSize(incomingTransfers.receivedBytes)} / ${formatFileSize(incomingTransfers.size)}`;
-
-    progressSpeed.textContent =
-        `${formatFileSize(speed)}/s`;
+    updateProgress(
+        incomingTransfer.receivedBytes,
+        incomingTransfer.size,
+        incomingTransfer.startTime
+    );
 }
 
 function finishIncomingFile() {
-    if (!incomingTransfers) {
+    if (!incomingTransfer) {
         return;
     }
 
     const transfer =
-        incomingTransfers;
+        incomingTransfer;
 
     try {
-        const blob = new Blob(
-            transfer.chunks,
-            {
-                type: transfer.mime
-            }
-        );
+        const blob =
+            new Blob(
+                transfer.chunks,
+                {
+                    type:
+                        transfer.mime
+                }
+            );
 
         const url =
-            URL.createObjectURL(blob);
+            URL.createObjectURL(
+                blob
+            );
 
-        const receivedFile = {
-            name: transfer.name,
-            size: transfer.size,
-            url,
-            createdAt: Date.now()
+        const file = {
+            name:
+                transfer.name,
+
+            size:
+                transfer.size,
+
+            url
         };
 
         receivedFiles.unshift(
-            receivedFile
+            file
         );
 
-        renderReceivedFiles();
+        /*
+         * Nunca falla aunque la sección
+         * de archivos recibidos no exista.
+         */
+        addReceivedFile(file);
 
-        progressPercent.textContent =
-            "100%";
-
-        progressBar.style.width =
-            "100%";
-
-        progressStatus.textContent =
-            "Archivo recibido";
-
-        progressSpeed.textContent = "";
-
-        receivedSection.classList.remove(
-            "hidden"
+        setProgressText(
+            "Archivo recibido",
+            "100%"
         );
 
         showModal(
@@ -997,85 +1149,112 @@ function finishIncomingFile() {
 
     } catch (error) {
         console.error(
-            "Error construyendo archivo:",
+            "Error procesando archivo:",
             error
         );
 
-        progressStatus.textContent =
-            "Error al guardar el archivo";
+        setProgressText(
+            "Error al procesar archivo",
+            "0%"
+        );
     }
 
-    incomingTransfers = {};
+    incomingTransfer = null;
 }
 
 /* =========================================================
    ARCHIVOS RECIBIDOS
    ========================================================= */
 
-function renderReceivedFiles() {
+function addReceivedFile(file) {
+    /*
+     * Si el HTML móvil no tiene esta sección,
+     * simplemente no se muestra la lista.
+     * El archivo igualmente se procesa correctamente.
+     */
     if (!receivedFilesList) {
         return;
     }
 
-    receivedFilesList.innerHTML = "";
-
-    receivedFiles.forEach(file => {
-        const item =
-            document.createElement("div");
-
-        item.className =
-            "received-file";
-
-        item.innerHTML = `
-            <div class="received-file-info">
-                <div class="received-file-name"></div>
-                <div class="received-file-size"></div>
-            </div>
-
-            <a
-                class="received-download"
-                download
-            ></a>
-        `;
-
-        const nameElement =
-            item.querySelector(
-                ".received-file-name"
-            );
-
-        const sizeElement =
-            item.querySelector(
-                ".received-file-size"
-            );
-
-        const downloadElement =
-            item.querySelector(
-                ".received-download"
-            );
-
-        nameElement.textContent =
-            file.name;
-
-        sizeElement.textContent =
-            formatFileSize(file.size);
-
-        downloadElement.textContent =
-            "Descargar";
-
-        downloadElement.href =
-            file.url;
-
-        downloadElement.download =
-            file.name;
-
-        receivedFilesList.appendChild(
-            item
+    const item =
+        document.createElement(
+            "div"
         );
-    });
+
+    item.className =
+        "received-file";
+
+    const info =
+        document.createElement(
+            "div"
+        );
+
+    info.className =
+        "received-file-info";
+
+    const name =
+        document.createElement(
+            "div"
+        );
+
+    name.className =
+        "received-file-name";
+
+    name.textContent =
+        file.name;
+
+    const size =
+        document.createElement(
+            "div"
+        );
+
+    size.className =
+        "received-file-size";
+
+    size.textContent =
+        formatFileSize(
+            file.size
+        );
+
+    const download =
+        document.createElement(
+            "a"
+        );
+
+    download.className =
+        "received-download";
+
+    download.textContent =
+        "Descargar";
+
+    download.href =
+        file.url;
+
+    download.download =
+        file.name;
+
+    info.appendChild(name);
+    info.appendChild(size);
+
+    item.appendChild(info);
+    item.appendChild(download);
+
+    receivedFilesList.prepend(
+        item
+    );
 
     if (receivedCount) {
         receivedCount.textContent =
             receivedFiles.length;
+    }
+
+    /*
+     * CORRECCIÓN DEL ERROR:
+     */
+    if (receivedSection) {
+        receivedSection.classList.remove(
+            "hidden"
+        );
     }
 }
 
@@ -1083,32 +1262,161 @@ function renderReceivedFiles() {
    PROGRESO
    ========================================================= */
 
+function showProgress(title) {
+    if (!progressCard) {
+        return;
+    }
+
+    progressCard.classList.remove(
+        "hidden"
+    );
+
+    if (progressTitle) {
+        progressTitle.textContent =
+            title;
+    }
+
+    if (progressPercent) {
+        progressPercent.textContent =
+            "0%";
+    }
+
+    if (progressBar) {
+        progressBar.style.width =
+            "0%";
+    }
+
+    if (progressStatus) {
+        progressStatus.textContent =
+            "Preparando...";
+    }
+
+    if (progressSpeed) {
+        progressSpeed.textContent =
+            "";
+    }
+}
+
+function updateProgress(
+    current,
+    total,
+    startTime
+) {
+    if (total <= 0) {
+        return;
+    }
+
+    const percent =
+        Math.min(
+            100,
+            Math.round(
+                (
+                    current /
+                    total
+                ) * 100
+            )
+        );
+
+    const elapsed =
+        (
+            performance.now() -
+            startTime
+        ) / 1000;
+
+    const speed =
+        elapsed > 0
+            ? current / elapsed
+            : 0;
+
+    if (progressPercent) {
+        progressPercent.textContent =
+            `${percent}%`;
+    }
+
+    if (progressBar) {
+        progressBar.style.width =
+            `${percent}%`;
+    }
+
+    if (progressStatus) {
+        progressStatus.textContent =
+            `${formatFileSize(current)} / ${formatFileSize(total)}`;
+    }
+
+    if (progressSpeed) {
+        progressSpeed.textContent =
+            `${formatFileSize(speed)}/s`;
+    }
+}
+
+function setProgressText(
+    status,
+    percent
+) {
+    if (progressStatus) {
+        progressStatus.textContent =
+            status;
+    }
+
+    if (progressPercent) {
+        progressPercent.textContent =
+            percent;
+    }
+
+    if (progressBar) {
+        progressBar.style.width =
+            percent;
+    }
+
+    if (progressSpeed) {
+        progressSpeed.textContent =
+            "";
+    }
+}
+
 function resetProgress() {
     if (!progressCard) {
         return;
     }
 
-    progressCard.classList.add("hidden");
+    progressCard.classList.add(
+        "hidden"
+    );
 
-    progressTitle.textContent = "";
-    progressPercent.textContent =
-        "0%";
+    if (progressTitle) {
+        progressTitle.textContent =
+            "";
+    }
 
-    progressBar.style.width =
-        "0%";
+    if (progressPercent) {
+        progressPercent.textContent =
+            "0%";
+    }
 
-    progressStatus.textContent =
-        "";
+    if (progressBar) {
+        progressBar.style.width =
+            "0%";
+    }
 
-    progressSpeed.textContent =
-        "";
+    if (progressStatus) {
+        progressStatus.textContent =
+            "";
+    }
+
+    if (progressSpeed) {
+        progressSpeed.textContent =
+            "";
+    }
 }
 
 /* =========================================================
    ESTADO
    ========================================================= */
 
-function setStatus(type, text) {
+function setStatus(
+    type,
+    text
+) {
     if (statusText) {
         statusText.textContent =
             text;
@@ -1143,32 +1451,41 @@ function showModal(
         return;
     }
 
-    modalIcon.textContent =
-        icon;
+    if (modalIcon) {
+        modalIcon.textContent =
+            icon;
+    }
 
-    modalTitle.textContent =
-        title;
+    if (modalTitle) {
+        modalTitle.textContent =
+            title;
+    }
 
-    modalMessage.textContent =
-        message;
+    if (modalMessage) {
+        modalMessage.textContent =
+            message;
+    }
 
-    modalConfirmBtn.textContent =
-        confirmText;
+    if (modalConfirmBtn) {
+        modalConfirmBtn.textContent =
+            confirmText;
+
+        modalConfirmBtn.onclick =
+            () => {
+                if (
+                    typeof onConfirm ===
+                    "function"
+                ) {
+                    onConfirm();
+                }
+
+                closeModal();
+            };
+    }
 
     customModal.classList.remove(
         "hidden"
     );
-
-    modalConfirmBtn.onclick = () => {
-        if (
-            typeof onConfirm ===
-            "function"
-        ) {
-            onConfirm();
-        }
-
-        closeModal();
-    };
 }
 
 function closeModal() {
@@ -1199,14 +1516,12 @@ function formatFileSize(bytes) {
         "TB"
     ];
 
-    const index = Math.floor(
-        Math.log(bytes) /
-        Math.log(1024)
-    );
-
-    const safeIndex =
+    const index =
         Math.min(
-            index,
+            Math.floor(
+                Math.log(bytes) /
+                Math.log(1024)
+            ),
             units.length - 1
         );
 
@@ -1214,12 +1529,14 @@ function formatFileSize(bytes) {
         bytes /
         Math.pow(
             1024,
-            safeIndex
+            index
         );
 
-    if (safeIndex === 0) {
-        return `${Math.round(value)} ${units[safeIndex]}`;
+    if (index === 0) {
+        return `${Math.round(value)} B`;
     }
 
-    return `${value.toFixed(value >= 100 ? 0 : 2)} ${units[safeIndex]}`;
+    return `${value.toFixed(
+        value >= 100 ? 0 : 2
+    )} ${units[index]}`;
 }
