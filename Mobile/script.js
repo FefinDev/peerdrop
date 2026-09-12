@@ -1,441 +1,486 @@
+"use strict";
+
+/* =========================================================
+   PeerDrop - Mobile
+   P2P File Transfer con PeerJS
+   ========================================================= */
+
 const CHUNK_SIZE = 64 * 1024;
-
 const PEER_ID_LENGTH = 6;
+const MOBILE_PATH = "/Mobile/";
 
-const characters =
-    "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-const PC_HOST =
-    "peerdrop.dns.navy";
-
-const MOBILE_HOST =
-    "mobile.peerdrop.dns.navy";
-
+const characters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 let peer = null;
-
 let connection = null;
-
 let selectedFile = null;
-
 let pendingPeerId = null;
 
+let incomingTransfers = {};
 let receivedFiles = [];
 
-let incomingTransfer = null;
+/* =========================================================
+   ELEMENTOS
+   ========================================================= */
 
+const statusBadge = document.getElementById("statusBadge");
+const statusText = document.getElementById("statusText");
 
-/* DOM */
+const connectionSection = document.getElementById("connectionSection");
+const transferSection = document.getElementById("transferSection");
 
-const statusBadge =
-    document.getElementById("statusBadge");
+const shareLinkInput = document.getElementById("shareLinkInput");
+const copyLinkBtn = document.getElementById("copyLinkBtn");
+const myIdDisplay = document.getElementById("myIdDisplay");
 
-const statusText =
-    document.getElementById("statusText");
+const connectForm = document.getElementById("connectForm");
+const remoteIdInput = document.getElementById("remoteIdInput");
 
-const connectionSection =
-    document.getElementById("connectionSection");
+const connectionTarget = document.getElementById("connectionTarget");
+const disconnectBtn = document.getElementById("disconnectBtn");
 
-const transferSection =
-    document.getElementById("transferSection");
+const dropZone = document.getElementById("dropZone");
+const selectFileBtn = document.getElementById("selectFileBtn");
+const fileInput = document.getElementById("fileInput");
 
-const shareLinkInput =
-    document.getElementById("shareLinkInput");
+const fileCard = document.getElementById("fileCard");
+const fileName = document.getElementById("fileName");
+const fileSize = document.getElementById("fileSize");
+const removeFileBtn = document.getElementById("removeFileBtn");
+const sendFileBtn = document.getElementById("sendFileBtn");
 
-const copyLinkBtn =
-    document.getElementById("copyLinkBtn");
+const progressCard = document.getElementById("progressCard");
+const progressTitle = document.getElementById("progressTitle");
+const progressPercent = document.getElementById("progressPercent");
+const progressBar = document.getElementById("progressBar");
+const progressStatus = document.getElementById("progressStatus");
+const progressSpeed = document.getElementById("progressSpeed");
 
-const myIdDisplay =
-    document.getElementById("myIdDisplay");
+const receivedSection = document.getElementById("receivedSection");
+const receivedFilesList = document.getElementById("receivedFilesList");
+const receivedCount = document.getElementById("receivedCount");
 
-const connectForm =
-    document.getElementById("connectForm");
+const customModal = document.getElementById("customModal");
+const modalIcon = document.getElementById("modalIcon");
+const modalTitle = document.getElementById("modalTitle");
+const modalMessage = document.getElementById("modalMessage");
+const modalCancelBtn = document.getElementById("modalCancelBtn");
+const modalConfirmBtn = document.getElementById("modalConfirmBtn");
 
-const remoteIdInput =
-    document.getElementById("remoteIdInput");
+/* =========================================================
+   INICIO
+   ========================================================= */
 
-const connectionTarget =
-    document.getElementById("connectionTarget");
-
-const disconnectBtn =
-    document.getElementById("disconnectBtn");
-
-const dropZone =
-    document.getElementById("dropZone");
-
-const selectFileBtn =
-    document.getElementById("selectFileBtn");
-
-const fileInput =
-    document.getElementById("fileInput");
-
-const fileCard =
-    document.getElementById("fileCard");
-
-const fileName =
-    document.getElementById("fileName");
-
-const fileSize =
-    document.getElementById("fileSize");
-
-const removeFileBtn =
-    document.getElementById("removeFileBtn");
-
-const sendFileBtn =
-    document.getElementById("sendFileBtn");
-
-const progressCard =
-    document.getElementById("progressCard");
-
-const progressTitle =
-    document.getElementById("progressTitle");
-
-const progressPercent =
-    document.getElementById("progressPercent");
-
-const progressBar =
-    document.getElementById("progressBar");
-
-const progressStatus =
-    document.getElementById("progressStatus");
-
-const progressSpeed =
-    document.getElementById("progressSpeed");
-
-const receivedFilesList =
-    document.getElementById("receivedFilesList");
-
-const receivedCount =
-    document.getElementById("receivedCount");
-
-const customModal =
-    document.getElementById("customModal");
-
-const modalIcon =
-    document.getElementById("modalIcon");
-
-const modalTitle =
-    document.getElementById("modalTitle");
-
-const modalMessage =
-    document.getElementById("modalMessage");
-
-const modalCancelBtn =
-    document.getElementById("modalCancelBtn");
-
-const modalConfirmBtn =
-    document.getElementById("modalConfirmBtn");
-
-
-/* INIT */
+document.addEventListener("DOMContentLoaded", initialize);
 
 function initialize() {
-
     setupEvents();
 
-    pendingPeerId =
-        getPeerIdFromHash();
+    pendingPeerId = getPeerIdFromHash();
 
-
+    /*
+     * Si alguien abre /Mobile/ desde una PC,
+     * vuelve automáticamente a la versión principal.
+     */
     if (redirectForDevice()) {
         return;
     }
 
-
     initializePeer();
 }
 
-
-/* DEVICE */
+/* =========================================================
+   DETECCIÓN DE DISPOSITIVO
+   ========================================================= */
 
 function isMobileDevice() {
-
     return (
         /Android|iPhone|iPad|iPod|Windows Phone|webOS|BlackBerry/i
             .test(navigator.userAgent)
-    )
-    ||
-    window.matchMedia(
-        "(max-width: 700px)"
-    ).matches;
+        || window.matchMedia("(max-width: 700px)").matches
+    );
 }
 
-
 function redirectForDevice() {
+    const isMobile = isMobileDevice();
 
-    const hostname =
-        window.location.hostname.toLowerCase();
+    const currentPath = window.location.pathname;
 
-    const hash =
-        window.location.hash;
+    const isMobilePage =
+        currentPath === MOBILE_PATH ||
+        currentPath.startsWith(MOBILE_PATH);
 
-
-    if (
-        hostname === PC_HOST &&
-        isMobileDevice()
-    ) {
+    /*
+     * Móvil en la página principal:
+     * mandarlo a /Mobile/
+     */
+    if (isMobile && !isMobilePage) {
+        const hash = window.location.hash || "";
 
         window.location.replace(
-            `https://${MOBILE_HOST}/Mobile/${hash}`
+            `${window.location.origin}${MOBILE_PATH}${hash}`
         );
 
         return true;
     }
 
-
-    if (
-        hostname === MOBILE_HOST &&
-        !isMobileDevice()
-    ) {
+    /*
+     * PC en /Mobile/:
+     * devolverlo a la página principal.
+     */
+    if (!isMobile && isMobilePage) {
+        const hash = window.location.hash || "";
 
         window.location.replace(
-            `https://${PC_HOST}/${hash}`
+            `${window.location.origin}/${hash}`
         );
 
         return true;
     }
-
 
     return false;
 }
 
+/* =========================================================
+   EVENTOS
+   ========================================================= */
 
-/* PEER */
+function setupEvents() {
+    if (connectForm) {
+        connectForm.addEventListener("submit", event => {
+            event.preventDefault();
 
-function generateShortPeerId() {
+            const id = remoteIdInput.value
+                .trim()
+                .toUpperCase();
 
-    let id = "";
-
-
-    for (
-        let i = 0;
-        i < PEER_ID_LENGTH;
-        i++
-    ) {
-
-        const randomIndex =
-            Math.floor(
-                Math.random() *
-                characters.length
-            );
-
-        id +=
-            characters[randomIndex];
+            connectToPeer(id);
+        });
     }
 
+    if (copyLinkBtn) {
+        copyLinkBtn.addEventListener("click", copyShareLink);
+    }
+
+    if (disconnectBtn) {
+        disconnectBtn.addEventListener("click", disconnect);
+    }
+
+    if (selectFileBtn) {
+        selectFileBtn.addEventListener("click", () => {
+            fileInput.click();
+        });
+    }
+
+    if (fileInput) {
+        fileInput.addEventListener("change", event => {
+            const file = event.target.files?.[0];
+
+            if (file) {
+                selectFile(file);
+            }
+        });
+    }
+
+    if (removeFileBtn) {
+        removeFileBtn.addEventListener("click", removeSelectedFile);
+    }
+
+    if (sendFileBtn) {
+        sendFileBtn.addEventListener("click", sendSelectedFile);
+    }
+
+    if (dropZone) {
+        dropZone.addEventListener("dragover", event => {
+            event.preventDefault();
+            dropZone.classList.add("drag-over");
+        });
+
+        dropZone.addEventListener("dragleave", () => {
+            dropZone.classList.remove("drag-over");
+        });
+
+        dropZone.addEventListener("drop", event => {
+            event.preventDefault();
+
+            dropZone.classList.remove("drag-over");
+
+            const file = event.dataTransfer.files?.[0];
+
+            if (file) {
+                selectFile(file);
+            }
+        });
+    }
+
+    window.addEventListener("hashchange", handleHashChange);
+
+    if (modalCancelBtn) {
+        modalCancelBtn.addEventListener("click", closeModal);
+    }
+}
+
+/* =========================================================
+   PEERJS
+   ========================================================= */
+
+function initializePeer() {
+    setStatus("connecting", "Conectando...");
+
+    const shortId = generateShortPeerId();
+
+    try {
+        peer = new Peer(shortId, {
+            debug: 0
+        });
+    } catch (error) {
+        console.error("Error creando Peer:", error);
+
+        setStatus("error", "Error");
+
+        showModal(
+            "⚠️",
+            "No se pudo iniciar PeerDrop",
+            "No fue posible iniciar la conexión P2P."
+        );
+
+        return;
+    }
+
+    peer.on("open", id => {
+        console.log("Peer móvil abierto:", id);
+
+        myIdDisplay.textContent = id;
+
+        shareLinkInput.value = generateShareLink(id);
+
+        copyLinkBtn.disabled = false;
+
+        setStatus("connected", "Listo");
+
+        /*
+         * Si el usuario llegó mediante un enlace:
+         * https://peerdrop.dns.navy/Mobile/#ABC123
+         *
+         * esperamos a PeerJS antes de conectarnos.
+         */
+        if (pendingPeerId && !connection) {
+            const targetId = pendingPeerId;
+
+            pendingPeerId = null;
+
+            setTimeout(() => {
+                connectToPeer(targetId, true);
+            }, 100);
+        }
+    });
+
+    peer.on("connection", incomingConnection => {
+        console.log(
+            "Conexión entrante:",
+            incomingConnection.peer
+        );
+
+        if (connection) {
+            try {
+                incomingConnection.close();
+            } catch {}
+
+            return;
+        }
+
+        setupConnection(incomingConnection);
+    });
+
+    peer.on("error", error => {
+        console.error("PeerJS error:", error);
+
+        if (error.type === "unavailable-id") {
+            console.warn(
+                "ID ocupado. Generando otro..."
+            );
+
+            try {
+                peer.destroy();
+            } catch {}
+
+            peer = null;
+
+            setTimeout(() => {
+                initializePeer();
+            }, 150);
+
+            return;
+        }
+
+        if (error.type === "peer-unavailable") {
+            setStatus("error", "No encontrado");
+
+            showModal(
+                "⚠️",
+                "Dispositivo no encontrado",
+                "No se pudo encontrar el código introducido."
+            );
+
+            return;
+        }
+
+        if (error.type === "network") {
+            setStatus("error", "Error de red");
+
+            showModal(
+                "⚠️",
+                "Error de conexión",
+                "No se pudo establecer la conexión."
+            );
+
+            return;
+        }
+
+        setStatus("error", "Error");
+    });
+
+    peer.on("disconnected", () => {
+        console.warn("Peer desconectado");
+
+        if (!connection) {
+            setStatus("connecting", "Reconectando...");
+
+            try {
+                peer.reconnect();
+            } catch {}
+        }
+    });
+
+    peer.on("close", () => {
+        console.log("Peer cerrado");
+    });
+}
+
+/* =========================================================
+   IDS
+   ========================================================= */
+
+function generateShortPeerId() {
+    let id = "";
+
+    for (let i = 0; i < PEER_ID_LENGTH; i++) {
+        const randomIndex =
+            Math.floor(Math.random() * characters.length);
+
+        id += characters[randomIndex];
+    }
 
     return id;
 }
 
+function getPeerIdFromHash() {
+    const hash = window.location.hash
+        .replace(/^#/, "")
+        .trim();
 
-function initializePeer() {
-
-    const shortId =
-        generateShortPeerId();
-
-
-    peer =
-        new Peer(
-            shortId,
-            {
-                debug: 0
-            }
-        );
-
-
-    peer.on(
-        "open",
-        id => {
-
-            myIdDisplay.textContent =
-                id;
-
-            shareLinkInput.value =
-                generateShareLink(id);
-
-            copyLinkBtn.disabled =
-                false;
-
-            setStatus(
-                "connected",
-                "Listo"
-            );
-
-
-            if (
-                pendingPeerId &&
-                !connection
-            ) {
-
-                const targetId =
-                    pendingPeerId;
-
-                pendingPeerId =
-                    null;
-
-
-                setTimeout(
-                    () => {
-
-                        connectToPeer(
-                            targetId,
-                            true
-                        );
-
-                    },
-                    100
-                );
-            }
-        }
-    );
-
-
-    peer.on(
-        "connection",
-        incomingConnection => {
-
-            if (connection) {
-
-                try {
-                    incomingConnection.close();
-                } catch {}
-
-                return;
-            }
-
-
-            connection =
-                incomingConnection;
-
-
-            setupConnection(
-                incomingConnection
-            );
-        }
-    );
-
-
-    peer.on(
-        "error",
-        error => {
-
-            console.error(
-                "PeerJS error:",
-                error
-            );
-
-
-            if (
-                error.type ===
-                "unavailable-id"
-            ) {
-
-                try {
-                    peer.destroy();
-                } catch {}
-
-
-                setTimeout(
-                    initializePeer,
-                    150
-                );
-
-                return;
-            }
-
-
-            if (
-                error.type ===
-                "peer-unavailable"
-            ) {
-
-                setStatus(
-                    "error",
-                    "No encontrado"
-                );
-
-
-                showModal(
-                    "!",
-                    "Dispositivo no encontrado",
-                    "No se pudo encontrar el código indicado."
-                );
-
-                return;
-            }
-
-
-            setStatus(
-                "error",
-                "Error"
-            );
-        }
-    );
-
-
-    peer.on(
-        "disconnected",
-        () => {
-
-            setStatus(
-                "error",
-                "Desconectado"
-            );
-        }
-    );
-}
-
-
-/* CONNECT */
-
-function connectToPeer(
-    id,
-    fromDirectLink = false
-) {
-
-    if (!peer) {
-
-        pendingPeerId =
-            id;
-
-        return;
+    if (!hash) {
+        return null;
     }
 
-
-    if (!peer.open) {
-
-        pendingPeerId =
-            id;
-
-        return;
-    }
-
-
-    if (
-        !id ||
-        id.length !== PEER_ID_LENGTH
-    ) {
-
-        showModal(
-            "!",
-            "Código inválido",
-            "El código debe tener 6 caracteres."
-        );
-
-        return;
-    }
-
-
-    id =
-        id
+    try {
+        return decodeURIComponent(hash)
             .trim()
             .toUpperCase();
+    } catch {
+        return hash.toUpperCase();
+    }
+}
 
+/* =========================================================
+   LINK COMPARTIDO
+   ========================================================= */
 
-    if (id === peer.id) {
+function generateShareLink(id) {
+    const url = new URL(window.location.href);
+
+    /*
+     * En móvil queremos conservar /Mobile/
+     * y solamente cambiar el hash.
+     */
+    url.hash = encodeURIComponent(id);
+
+    return url.toString();
+}
+
+async function copyShareLink() {
+    if (!shareLinkInput?.value) {
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(
+            shareLinkInput.value
+        );
+
+        const originalText =
+            copyLinkBtn.textContent;
+
+        copyLinkBtn.textContent = "Copiado";
+
+        setTimeout(() => {
+            copyLinkBtn.textContent =
+                originalText;
+        }, 1500);
+
+    } catch {
+        shareLinkInput.select();
+
+        document.execCommand("copy");
 
         showModal(
-            "!",
+            "✓",
+            "Enlace copiado",
+            "El enlace fue copiado al portapapeles."
+        );
+    }
+}
+
+/* =========================================================
+   CONEXIÓN
+   ========================================================= */
+
+function connectToPeer(id, fromDirectLink = false) {
+    if (!id) {
+        showModal(
+            "⚠️",
+            "Código vacío",
+            "Introduce el código del dispositivo."
+        );
+
+        return;
+    }
+
+    id = id.trim().toUpperCase();
+
+    if (!peer) {
+        pendingPeerId = id;
+        return;
+    }
+
+    if (!peer.open) {
+        pendingPeerId = id;
+        return;
+    }
+
+    if (id.length !== PEER_ID_LENGTH) {
+        showModal(
+            "⚠️",
+            "Código inválido",
+            `El código debe tener ${PEER_ID_LENGTH} caracteres.`
+        );
+
+        return;
+    }
+
+    if (id === peer.id) {
+        showModal(
+            "⚠️",
             "Código inválido",
             "No puedes conectarte a tu propio dispositivo."
         );
@@ -443,9 +488,7 @@ function connectToPeer(
         return;
     }
 
-
     if (connection) {
-
         try {
             connection.close();
         } catch {}
@@ -453,81 +496,57 @@ function connectToPeer(
         connection = null;
     }
 
-
-    setStatus(
-        "connecting",
-        "Conectando..."
-    );
-
+    setStatus("connecting", "Conectando...");
 
     connectionTarget.textContent =
         `Conectando con ${id}...`;
 
-
     try {
+        const newConnection = peer.connect(id, {
+            reliable: true
+        });
 
-        const newConnection =
-            peer.connect(
-                id,
-                {
-                    reliable: true
-                }
-            );
-
-
-        setupConnection(
-            newConnection
-        );
+        setupConnection(newConnection);
 
     } catch (error) {
-
         console.error(error);
 
-        setStatus(
-            "error",
-            "Error"
+        setStatus("error", "Error");
+
+        showModal(
+            "⚠️",
+            "No se pudo conectar",
+            "Ocurrió un error al establecer la conexión."
         );
     }
 }
 
-
-/* CONNECTION */
-
 function setupConnection(conn) {
+    connection = conn;
 
-    connection =
-        conn;
+    conn.on("open", () => {
+        console.log(
+            "Conexión abierta con:",
+            conn.peer
+        );
 
+        connectionTarget.textContent =
+            `Conectado con ${conn.peer}`;
 
-    conn.on(
-        "open",
-        () => {
+        setStatus("connected", "Conectado");
 
-            setStatus(
-                "connected",
-                "Conectado"
-            );
+        if (connectionSection) {
+            connectionSection.classList.add("hidden");
+        }
 
+        if (transferSection) {
+            transferSection.classList.remove("hidden");
+        }
 
-            connectionTarget.textContent =
-                `Conectado con ${conn.peer}`;
-
-
-            connectionSection.classList.add(
-                "hidden"
-            );
-
-
-            transferSection.classList.remove(
-                "hidden"
-            );
-
-
-            transferSection.classList.add(
-                "fade-in"
-            );
-
-
+        /*
+         * Eliminamos el hash una vez conectados.
+         */
+        if (window.location.hash) {
             history.replaceState(
                 null,
                 "",
@@ -535,996 +554,642 @@ function setupConnection(conn) {
                 window.location.search
             );
         }
-    );
+    });
 
+    conn.on("data", handleIncomingData);
 
-    conn.on(
-        "data",
-        handleIncomingData
-    );
+    conn.on("close", () => {
+        console.log("Conexión cerrada");
 
+        connection = null;
 
-    conn.on(
-        "close",
-        () => {
+        setStatus("connected", "Listo");
 
-            if (
-                connection === conn
-            ) {
-
-                connection = null;
-
-
-                transferSection.classList.add(
-                    "hidden"
-                );
-
-
-                connectionSection.classList.remove(
-                    "hidden"
-                );
-
-
-                setStatus(
-                    "connected",
-                    "Listo"
-                );
-
-
-                connectionTarget.textContent =
-                    "Desconectado";
-            }
+        if (connectionSection) {
+            connectionSection.classList.remove("hidden");
         }
-    );
 
-
-    conn.on(
-        "error",
-        error => {
-
-            console.error(
-                "Connection error:",
-                error
-            );
-
-            setStatus(
-                "error",
-                "Error"
-            );
+        if (transferSection) {
+            transferSection.classList.add("hidden");
         }
-    );
+
+        connectionTarget.textContent =
+            "Sin conexión";
+
+        resetProgress();
+
+        showModal(
+            "ℹ️",
+            "Conexión cerrada",
+            "La conexión con el otro dispositivo se cerró."
+        );
+    });
+
+    conn.on("error", error => {
+        console.error(
+            "Connection error:",
+            error
+        );
+
+        connection = null;
+
+        setStatus(
+            "error",
+            "Error de conexión"
+        );
+
+        if (connectionSection) {
+            connectionSection.classList.remove("hidden");
+        }
+
+        if (transferSection) {
+            transferSection.classList.add("hidden");
+        }
+    });
 }
 
-
-/* HASH */
-
-function getPeerIdFromHash() {
-
-    const hash =
-        window.location.hash;
-
-
-    if (
-        !hash ||
-        hash.length < 2
-    ) {
-        return null;
+function disconnect() {
+    if (connection) {
+        try {
+            connection.close();
+        } catch {}
     }
 
+    connection = null;
 
-    try {
-
-        return decodeURIComponent(
-            hash.substring(1)
-        )
-            .trim()
-            .toUpperCase();
-
-    } catch {
-
-        return hash
-            .substring(1)
-            .trim()
-            .toUpperCase();
+    if (connectionSection) {
+        connectionSection.classList.remove("hidden");
     }
+
+    if (transferSection) {
+        transferSection.classList.add("hidden");
+    }
+
+    connectionTarget.textContent =
+        "Sin conexión";
+
+    setStatus("connected", "Listo");
+
+    resetProgress();
 }
 
+/* =========================================================
+   ENLACES DIRECTOS
+   ========================================================= */
 
 function handleHashChange() {
-
-    const id =
-        getPeerIdFromHash();
-
+    const id = getPeerIdFromHash();
 
     if (!id) {
         return;
     }
 
-
-    if (
-        !peer ||
-        !peer.open
-    ) {
-
-        pendingPeerId =
-            id;
-
+    if (!peer || !peer.open) {
+        pendingPeerId = id;
         return;
     }
-
 
     if (connection) {
         return;
     }
 
+    pendingPeerId = null;
 
-    pendingPeerId =
-        null;
-
-
-    connectToPeer(
-        id,
-        true
-    );
+    connectToPeer(id, true);
 }
 
-
-/* SHARE */
-
-function generateShareLink(id) {
-
-    const url =
-        new URL(
-            window.location.href
-        );
-
-
-    url.hash =
-        encodeURIComponent(id);
-
-
-    return url.toString();
-}
-
-
-/* EVENTS */
-
-function setupEvents() {
-
-    connectForm.addEventListener(
-        "submit",
-        event => {
-
-            event.preventDefault();
-
-            connectToPeer(
-                remoteIdInput.value
-            );
-        }
-    );
-
-
-    remoteIdInput.addEventListener(
-        "input",
-        () => {
-
-            remoteIdInput.value =
-                remoteIdInput.value
-                    .replace(
-                        /[^a-zA-Z0-9]/g,
-                        ""
-                    )
-                    .toUpperCase()
-                    .slice(
-                        0,
-                        PEER_ID_LENGTH
-                    );
-        }
-    );
-
-
-    copyLinkBtn.addEventListener(
-        "click",
-        async () => {
-
-            try {
-
-                await navigator.clipboard.writeText(
-                    shareLinkInput.value
-                );
-
-
-                copyLinkBtn.textContent =
-                    "Copiado";
-
-
-                setTimeout(
-                    () => {
-
-                        copyLinkBtn.textContent =
-                            "Copiar";
-
-                    },
-                    1500
-                );
-
-            } catch {
-
-                shareLinkInput.select();
-
-                document.execCommand(
-                    "copy"
-                );
-            }
-        }
-    );
-
-
-    selectFileBtn.addEventListener(
-        "click",
-        () => fileInput.click()
-    );
-
-
-    fileInput.addEventListener(
-        "change",
-        event => {
-
-            const file =
-                event.target.files[0];
-
-
-            if (file) {
-                selectFile(file);
-            }
-        }
-    );
-
-
-    removeFileBtn.addEventListener(
-        "click",
-        clearSelectedFile
-    );
-
-
-    sendFileBtn.addEventListener(
-        "click",
-        sendSelectedFile
-    );
-
-
-    dropZone.addEventListener(
-        "dragover",
-        event => {
-
-            event.preventDefault();
-
-            dropZone.classList.add(
-                "dragover"
-            );
-        }
-    );
-
-
-    dropZone.addEventListener(
-        "dragleave",
-        () => {
-
-            dropZone.classList.remove(
-                "dragover"
-            );
-        }
-    );
-
-
-    dropZone.addEventListener(
-        "drop",
-        event => {
-
-            event.preventDefault();
-
-            dropZone.classList.remove(
-                "dragover"
-            );
-
-
-            const file =
-                event.dataTransfer.files[0];
-
-
-            if (file) {
-                selectFile(file);
-            }
-        }
-    );
-
-
-    disconnectBtn.addEventListener(
-        "click",
-        disconnect
-    );
-
-
-    modalCancelBtn.addEventListener(
-        "click",
-        closeModal
-    );
-
-
-    window.addEventListener(
-        "hashchange",
-        handleHashChange
-    );
-}
-
-
-/* FILE */
+/* =========================================================
+   ARCHIVOS
+   ========================================================= */
 
 function selectFile(file) {
+    selectedFile = file;
 
-    selectedFile =
-        file;
-
-
-    fileName.textContent =
-        file.name;
-
+    fileName.textContent = file.name;
 
     fileSize.textContent =
-        formatBytes(
-            file.size
-        );
+        formatFileSize(file.size);
 
+    fileCard.classList.remove("hidden");
 
-    fileCard.classList.remove(
-        "hidden"
-    );
+    sendFileBtn.disabled = !connection;
 }
 
+function removeSelectedFile() {
+    selectedFile = null;
 
-function clearSelectedFile() {
+    if (fileInput) {
+        fileInput.value = "";
+    }
 
-    selectedFile =
-        null;
+    fileCard.classList.add("hidden");
 
-
-    fileInput.value =
-        "";
-
-
-    fileCard.classList.add(
-        "hidden"
-    );
+    sendFileBtn.disabled = true;
 }
-
-
-/* SEND */
 
 async function sendSelectedFile() {
+    if (!selectedFile) {
+        return;
+    }
 
-    if (
-        !selectedFile ||
-        !connection ||
-        !connection.open
-    ) {
+    if (!connection || !connection.open) {
+        showModal(
+            "⚠️",
+            "Sin conexión",
+            "Primero debes conectarte con otro dispositivo."
+        );
 
         return;
     }
 
+    const file = selectedFile;
 
-    const file =
-        selectedFile;
+    sendFileBtn.disabled = true;
+    removeFileBtn.disabled = true;
 
-
-    progressCard.classList.remove(
-        "hidden"
-    );
-
+    progressCard.classList.remove("hidden");
 
     progressTitle.textContent =
         `Enviando ${file.name}`;
 
-
     progressStatus.textContent =
-        "Preparando...";
+        "Preparando archivo...";
 
+    progressPercent.textContent = "0%";
+    progressBar.style.width = "0%";
+    progressSpeed.textContent = "";
 
-    progressSpeed.textContent =
-        "";
-
-
-    progressBar.style.width =
-        "0%";
-
-
-    progressPercent.textContent =
-        "0%";
-
-
-    const startTime =
-        performance.now();
-
-
-    connection.send({
-        type: "file-start",
-
-        name: file.name,
-
-        size: file.size,
-
-        mime:
-            file.type ||
-            "application/octet-stream"
-    });
-
+    const totalChunks =
+        Math.ceil(file.size / CHUNK_SIZE);
 
     let offset = 0;
+    let chunkIndex = 0;
 
+    const startTime = performance.now();
 
-    while (
-        offset < file.size
-    ) {
-
-        const chunk =
-            await file
-                .slice(
-                    offset,
-                    offset + CHUNK_SIZE
-                )
-                .arrayBuffer();
-
-
+    try {
         connection.send({
-            type: "file-chunk",
-
-            data: chunk
+            type: "file-start",
+            name: file.name,
+            size: file.size,
+            mime:
+                file.type ||
+                "application/octet-stream",
+            totalChunks
         });
 
+        while (offset < file.size) {
+            const chunk = file.slice(
+                offset,
+                offset + CHUNK_SIZE
+            );
 
-        offset +=
-            chunk.byteLength;
+            const buffer =
+                await chunk.arrayBuffer();
 
+            connection.send({
+                type: "file-chunk",
+                index: chunkIndex,
+                data: buffer
+            });
 
-        const percent =
-            file.size === 0
-                ? 100
-                : Math.min(
-                    100,
-                    Math.round(
-                        (
-                            offset /
-                            file.size
-                        ) *
-                        100
-                    )
-                );
+            offset += chunk.size;
+            chunkIndex++;
 
+            const percent =
+                file.size === 0
+                    ? 100
+                    : Math.round(
+                        (offset / file.size) * 100
+                    );
 
-        progressBar.style.width =
-            `${percent}%`;
+            const elapsed =
+                (performance.now() -
+                    startTime) / 1000;
 
+            const speed =
+                elapsed > 0
+                    ? offset / elapsed
+                    : 0;
 
-        progressPercent.textContent =
-            `${percent}%`;
+            progressPercent.textContent =
+                `${percent}%`;
 
+            progressBar.style.width =
+                `${percent}%`;
 
-        const elapsed =
-            (
-                performance.now() -
-                startTime
-            ) / 1000;
-
-
-        if (elapsed > 0) {
+            progressStatus.textContent =
+                `${formatFileSize(offset)} / ${formatFileSize(file.size)}`;
 
             progressSpeed.textContent =
-                `${formatBytes(
-                    offset / elapsed
-                )}/s`;
+                `${formatFileSize(speed)}/s`;
+
+            await new Promise(resolve =>
+                setTimeout(resolve, 0)
+            );
         }
 
-
-        progressStatus.textContent =
-            `${formatBytes(offset)} / ${formatBytes(file.size)}`;
-    }
-
-
-    connection.send({
-        type: "file-end"
-    });
-
-
-    progressStatus.textContent =
-        "Transferencia completada";
-
-
-    progressBar.style.width =
-        "100%";
-
-
-    progressPercent.textContent =
-        "100%";
-
-
-    setTimeout(
-        () => {
-
-            progressCard.classList.add(
-                "hidden"
-            );
-
-        },
-        1800
-    );
-}
-
-
-/* RECEIVE */
-
-function handleIncomingData(data) {
-
-    if (
-        !data ||
-        typeof data !== "object"
-    ) {
-        return;
-    }
-
-
-    if (
-        data.type ===
-        "file-start"
-    ) {
-
-        incomingTransfer = {
-
-            name:
-                data.name,
-
-            size:
-                data.size,
-
-            mime:
-                data.mime ||
-                "application/octet-stream",
-
-            chunks: [],
-
-            received: 0,
-
-            startTime:
-                performance.now()
-        };
-
-
-        progressCard.classList.remove(
-            "hidden"
-        );
-
-
-        progressTitle.textContent =
-            `Recibiendo ${data.name}`;
-
-
-        progressStatus.textContent =
-            "Recibiendo...";
-
-
-        progressSpeed.textContent =
-            "";
-
-
-        progressBar.style.width =
-            "0%";
-
+        connection.send({
+            type: "file-end"
+        });
 
         progressPercent.textContent =
-            "0%";
+            "100%";
 
+        progressBar.style.width =
+            "100%";
 
-        return;
-    }
+        progressStatus.textContent =
+            "Archivo enviado";
 
+        progressSpeed.textContent = "";
 
-    if (
-        data.type ===
-        "file-chunk"
-    ) {
-
-        if (!incomingTransfer) {
-            return;
-        }
-
-
-        incomingTransfer.chunks.push(
-            data.data
+    } catch (error) {
+        console.error(
+            "Error enviando archivo:",
+            error
         );
 
+        progressStatus.textContent =
+            "Error al enviar el archivo";
 
-        incomingTransfer.received +=
-            data.data.byteLength;
+        showModal(
+            "⚠️",
+            "Error de transferencia",
+            "No se pudo completar el envío del archivo."
+        );
 
-
-        updateReceiveProgress();
-
-        return;
-    }
-
-
-    if (
-        data.type ===
-        "file-end"
-    ) {
-
-        finishIncomingTransfer();
+    } finally {
+        sendFileBtn.disabled = false;
+        removeFileBtn.disabled = false;
     }
 }
 
+/* =========================================================
+   RECEPCIÓN
+   ========================================================= */
 
-/* RECEIVE PROGRESS */
-
-function updateReceiveProgress() {
-
-    if (!incomingTransfer) {
+function handleIncomingData(data) {
+    if (!data || typeof data !== "object") {
         return;
     }
 
+    if (data.type === "file-start") {
+        startIncomingFile(data);
+        return;
+    }
 
-    const transfer =
-        incomingTransfer;
+    if (data.type === "file-chunk") {
+        receiveFileChunk(data);
+        return;
+    }
 
+    if (data.type === "file-end") {
+        finishIncomingFile();
+    }
+}
 
-    const percent =
-        transfer.size === 0
-            ? 100
-            : Math.min(
-                100,
-                Math.round(
-                    (
-                        transfer.received /
-                        transfer.size
-                    ) *
-                    100
-                )
-            );
+function startIncomingFile(data) {
+    incomingTransfers = {
+        name: data.name || "archivo",
+        size: Number(data.size) || 0,
+        mime:
+            data.mime ||
+            "application/octet-stream",
+        totalChunks:
+            Number(data.totalChunks) || 0,
+        chunks: [],
+        receivedChunks: 0,
+        receivedBytes: 0,
+        startTime: performance.now()
+    };
 
+    progressCard.classList.remove("hidden");
 
-    progressBar.style.width =
-        `${percent}%`;
-
+    progressTitle.textContent =
+        `Recibiendo ${incomingTransfers.name}`;
 
     progressPercent.textContent =
-        `${percent}%`;
+        "0%";
 
+    progressBar.style.width =
+        "0%";
 
     progressStatus.textContent =
-        `${formatBytes(
-            transfer.received
-        )} / ${formatBytes(
-            transfer.size
-        )}`;
+        `0 B / ${formatFileSize(incomingTransfers.size)}`;
 
+    progressSpeed.textContent = "";
+}
+
+function receiveFileChunk(data) {
+    if (
+        !incomingTransfers ||
+        !incomingTransfers.chunks
+    ) {
+        return;
+    }
+
+    let chunk = data.data;
+
+    if (!(chunk instanceof ArrayBuffer)) {
+        if (chunk?.buffer instanceof ArrayBuffer) {
+            chunk = chunk.buffer;
+        } else {
+            return;
+        }
+    }
+
+    incomingTransfers.chunks[data.index] =
+        chunk;
+
+    incomingTransfers.receivedChunks++;
+
+    incomingTransfers.receivedBytes +=
+        chunk.byteLength || 0;
+
+    const percent =
+        incomingTransfers.size === 0
+            ? 100
+            : Math.round(
+                (
+                    incomingTransfers.receivedBytes /
+                    incomingTransfers.size
+                ) * 100
+            );
 
     const elapsed =
         (
             performance.now() -
-            transfer.startTime
+            incomingTransfers.startTime
         ) / 1000;
 
+    const speed =
+        elapsed > 0
+            ? incomingTransfers.receivedBytes /
+              elapsed
+            : 0;
 
-    if (elapsed > 0) {
+    progressPercent.textContent =
+        `${Math.min(percent, 100)}%`;
 
-        progressSpeed.textContent =
-            `${formatBytes(
-                transfer.received /
-                elapsed
-            )}/s`;
-    }
+    progressBar.style.width =
+        `${Math.min(percent, 100)}%`;
+
+    progressStatus.textContent =
+        `${formatFileSize(incomingTransfers.receivedBytes)} / ${formatFileSize(incomingTransfers.size)}`;
+
+    progressSpeed.textContent =
+        `${formatFileSize(speed)}/s`;
 }
 
-
-/* FINISH RECEIVE */
-
-function finishIncomingTransfer() {
-
-    if (!incomingTransfer) {
+function finishIncomingFile() {
+    if (!incomingTransfers) {
         return;
     }
 
-
     const transfer =
-        incomingTransfer;
+        incomingTransfers;
 
-
-    const blob =
-        new Blob(
+    try {
+        const blob = new Blob(
             transfer.chunks,
             {
                 type: transfer.mime
             }
         );
 
+        const url =
+            URL.createObjectURL(blob);
 
-    const url =
-        URL.createObjectURL(
-            blob
+        const receivedFile = {
+            name: transfer.name,
+            size: transfer.size,
+            url,
+            createdAt: Date.now()
+        };
+
+        receivedFiles.unshift(
+            receivedFile
         );
 
+        renderReceivedFiles();
 
-    addReceivedFile(
-        transfer.name,
-        transfer.size,
-        url
-    );
+        progressPercent.textContent =
+            "100%";
 
+        progressBar.style.width =
+            "100%";
 
-    progressBar.style.width =
-        "100%";
+        progressStatus.textContent =
+            "Archivo recibido";
 
+        progressSpeed.textContent = "";
 
-    progressPercent.textContent =
-        "100%";
+        receivedSection.classList.remove(
+            "hidden"
+        );
 
+        showModal(
+            "✓",
+            "Archivo recibido",
+            `"${transfer.name}" se recibió correctamente.`
+        );
 
-    progressStatus.textContent =
-        "Transferencia completada";
+    } catch (error) {
+        console.error(
+            "Error construyendo archivo:",
+            error
+        );
 
+        progressStatus.textContent =
+            "Error al guardar el archivo";
+    }
 
-    incomingTransfer =
-        null;
+    incomingTransfers = {};
+}
 
+/* =========================================================
+   ARCHIVOS RECIBIDOS
+   ========================================================= */
 
-    setTimeout(
-        () => {
+function renderReceivedFiles() {
+    if (!receivedFilesList) {
+        return;
+    }
 
-            progressCard.classList.add(
-                "hidden"
+    receivedFilesList.innerHTML = "";
+
+    receivedFiles.forEach(file => {
+        const item =
+            document.createElement("div");
+
+        item.className =
+            "received-file";
+
+        item.innerHTML = `
+            <div class="received-file-info">
+                <div class="received-file-name"></div>
+                <div class="received-file-size"></div>
+            </div>
+
+            <a
+                class="received-download"
+                download
+            ></a>
+        `;
+
+        const nameElement =
+            item.querySelector(
+                ".received-file-name"
             );
 
-        },
-        1800
-    );
-}
+        const sizeElement =
+            item.querySelector(
+                ".received-file-size"
+            );
 
+        const downloadElement =
+            item.querySelector(
+                ".received-download"
+            );
 
-/* RECEIVED */
+        nameElement.textContent =
+            file.name;
 
-function addReceivedFile(
-    name,
-    size,
-    url
-) {
+        sizeElement.textContent =
+            formatFileSize(file.size);
 
-    receivedFiles.push({
-        name,
-        size,
-        url
+        downloadElement.textContent =
+            "Descargar";
+
+        downloadElement.href =
+            file.url;
+
+        downloadElement.download =
+            file.name;
+
+        receivedFilesList.appendChild(
+            item
+        );
     });
 
-
-    receivedCount.textContent =
-        receivedFiles.length;
-
-
-    const empty =
-        receivedFilesList.querySelector(
-            ".empty-state"
-        );
-
-
-    if (empty) {
-        empty.remove();
+    if (receivedCount) {
+        receivedCount.textContent =
+            receivedFiles.length;
     }
-
-
-    const item =
-        document.createElement(
-            "div"
-        );
-
-
-    item.className =
-        "received-file";
-
-
-    const info =
-        document.createElement(
-            "div"
-        );
-
-
-    info.className =
-        "received-file-info";
-
-
-    const title =
-        document.createElement(
-            "strong"
-        );
-
-
-    title.textContent =
-        name;
-
-
-    const sizeElement =
-        document.createElement(
-            "span"
-        );
-
-
-    sizeElement.textContent =
-        formatBytes(size);
-
-
-    info.appendChild(title);
-
-    info.appendChild(sizeElement);
-
-
-    const button =
-        document.createElement(
-            "a"
-        );
-
-
-    button.className =
-        "secondary-btn download-btn";
-
-
-    button.textContent =
-        "Descargar";
-
-
-    button.href =
-        url;
-
-
-    button.download =
-        name;
-
-
-    item.appendChild(info);
-
-    item.appendChild(button);
-
-
-    receivedFilesList.prepend(
-        item
-    );
 }
 
+/* =========================================================
+   PROGRESO
+   ========================================================= */
 
-/* DISCONNECT */
-
-function disconnect() {
-
-    if (connection) {
-
-        try {
-            connection.close();
-        } catch {}
-
-        connection =
-            null;
+function resetProgress() {
+    if (!progressCard) {
+        return;
     }
 
+    progressCard.classList.add("hidden");
 
-    clearSelectedFile();
+    progressTitle.textContent = "";
+    progressPercent.textContent =
+        "0%";
 
+    progressBar.style.width =
+        "0%";
 
-    transferSection.classList.add(
-        "hidden"
-    );
+    progressStatus.textContent =
+        "";
 
-
-    connectionSection.classList.remove(
-        "hidden"
-    );
-
-
-    setStatus(
-        "connected",
-        "Listo"
-    );
-
-
-    history.replaceState(
-        null,
-        "",
-        window.location.pathname +
-        window.location.search
-    );
+    progressSpeed.textContent =
+        "";
 }
 
+/* =========================================================
+   ESTADO
+   ========================================================= */
 
-/* STATUS */
+function setStatus(type, text) {
+    if (statusText) {
+        statusText.textContent =
+            text;
+    }
 
-function setStatus(
-    type,
-    text
-) {
-
-    statusBadge.classList.remove(
-        "connected",
-        "error"
-    );
-
-
-    if (
-        type ===
-        "connected"
-    ) {
+    if (statusBadge) {
+        statusBadge.className =
+            "status-badge";
 
         statusBadge.classList.add(
-            "connected"
-        );
-
-    } else if (
-        type ===
-        "error"
-    ) {
-
-        statusBadge.classList.add(
-            "error"
+            `status-${type}`
         );
     }
-
-
-    statusText.textContent =
-        text;
 }
 
-
-/* MODAL */
+/* =========================================================
+   MODAL
+   ========================================================= */
 
 function showModal(
     icon,
     title,
-    message
+    message,
+    confirmText = "Aceptar",
+    onConfirm = null
 ) {
+    if (!customModal) {
+        alert(
+            `${title}\n\n${message}`
+        );
+
+        return;
+    }
 
     modalIcon.textContent =
         icon;
 
-
     modalTitle.textContent =
         title;
-
 
     modalMessage.textContent =
         message;
 
+    modalConfirmBtn.textContent =
+        confirmText;
 
     customModal.classList.remove(
         "hidden"
     );
 
+    modalConfirmBtn.onclick = () => {
+        if (
+            typeof onConfirm ===
+            "function"
+        ) {
+            onConfirm();
+        }
 
-    modalConfirmBtn.onclick =
-        closeModal;
+        closeModal();
+    };
 }
-
 
 function closeModal() {
-
-    customModal.classList.add(
-        "hidden"
-    );
+    if (customModal) {
+        customModal.classList.add(
+            "hidden"
+        );
+    }
 }
 
+/* =========================================================
+   UTILIDADES
+   ========================================================= */
 
-/* FORMAT */
-
-function formatBytes(bytes) {
-
+function formatFileSize(bytes) {
     if (
-        !bytes ||
+        !Number.isFinite(bytes) ||
         bytes <= 0
     ) {
         return "0 B";
     }
-
 
     const units = [
         "B",
@@ -1534,26 +1199,27 @@ function formatBytes(bytes) {
         "TB"
     ];
 
+    const index = Math.floor(
+        Math.log(bytes) /
+        Math.log(1024)
+    );
 
-    const index =
-        Math.floor(
-            Math.log(bytes) /
-            Math.log(1024)
+    const safeIndex =
+        Math.min(
+            index,
+            units.length - 1
         );
 
-
-    return `${(
+    const value =
         bytes /
         Math.pow(
             1024,
-            index
-        )
-    ).toFixed(
-        index === 0
-            ? 0
-            : 2
-    )} ${units[index]}`;
+            safeIndex
+        );
+
+    if (safeIndex === 0) {
+        return `${Math.round(value)} ${units[safeIndex]}`;
+    }
+
+    return `${value.toFixed(value >= 100 ? 0 : 2)} ${units[safeIndex]}`;
 }
-
-
-initialize();
