@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>PeerDrop</title>
+    <meta name="description" content="Transferencia de archivos P2P directa y privada">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="app-container">
+
+    <header class="main-header">
+        <div>
+            <h1 class="header-title">PeerDrop</h1>
+            <p class="header-subtitle">Transferencia de archivos P2P</p>
+        </div>
+
+        <div class="status-badge" id="statusBadge">
+            <span class="status-dot"></span>
+            <span id="statusText">Iniciando...</span>
+        </div>
+    </header>
+
+    <main class="main-content">
+
+        <section class="view-section fade-in" id="connectionSection">
+
+            <div class="card hero-card">
+                <div class="card-header">
+                    <div class="card-icon">↗</div>
+
+                    <div>
+                        <h2>Comparte tu conexión</h2>
+                        <p class="card-description">
+                            Envía este enlace o código al dispositivo con el que quieres compartir archivos.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="link-box">
+                    <input
+                        type="text"
+                        id="shareLinkInput"
+                        readonly
+                        placeholder="Generando enlace..."
+                    >
+
+                    <button class="secondary-btn" id="copyLinkBtn" disabled>
+                        Copiar
+                    </button>
+                </div>
+
+                <div class="id-row">
+                    <span class="id-label">Tu código</span>
+                    <strong id="myIdDisplay">------</strong>
+                </div>
+            </div>
+
+            <div class="card slide-up">
+                <div class="card-header">
+                    <div class="card-icon">↔</div>
+
+                    <div>
+                        <h2>Conectar a otro dispositivo</h2>
+                        <p class="card-description">
+                            Introduce el código de 6 caracteres del otro dispositivo.
+                        </p>
+                    </div>
+                </div>
+
+                <form id="connectForm">
+                    <div class="input-group">
+                        <input
+                            type="text"
+                            id="remoteIdInput"
+                            maxlength="6"
+                            autocomplete="off"
+                            placeholder="Ej. A7K2Q9"
+                        >
+
+                        <button class="primary-btn" type="submit">
+                            Conectar
+                        </button>
+                    </div>
+
+                    <span class="input-help">
+                        También puedes abrir directamente un enlace compartido.
+                    </span>
+                </form>
+            </div>
+
+        </section>
+
+
+        <section class="view-section fade-in hidden" id="transferSection">
+
+            <div class="transfer-header">
+                <div>
+                    <h2>Transferencia</h2>
+                    <p id="connectionTarget">Conectado</p>
+                </div>
+
+                <button class="danger-btn" id="disconnectBtn">
+                    Desconectar
+                </button>
+            </div>
+
+
+            <div class="card">
+                <div
+                    class="drop-zone"
+                    id="dropZone"
+                >
+                    <div class="drop-icon">↑</div>
+
+                    <h3>Arrastra un archivo aquí</h3>
+
+                    <p>o selecciona uno desde tu dispositivo</p>
+
+                    <button
+                        type="button"
+                        class="secondary-btn"
+                        id="selectFileBtn"
+                    >
+                        Seleccionar archivo
+                    </button>
+
+                    <input
+                        type="file"
+                        id="fileInput"
+                        hidden
+                    >
+                </div>
+
+
+                <div class="file-card hidden" id="fileCard">
+
+                    <div class="file-main">
+
+                        <div class="file-icon-large">
+                            FILE
+                        </div>
+
+                        <div class="file-details">
+                            <strong id="fileName">archivo</strong>
+                            <span id="fileSize">0 B</span>
+                        </div>
+
+                    </div>
+
+                    <div class="file-actions">
+
+                        <button
+                            class="secondary-btn"
+                            id="removeFileBtn"
+                        >
+                            Quitar
+                        </button>
+
+                        <button
+                            class="primary-btn"
+                            id="sendFileBtn"
+                        >
+                            Enviar
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="card progress-card hidden" id="progressCard">
+
+                <div class="progress-header">
+                    <strong id="progressTitle">
+                        Preparando transferencia...
+                    </strong>
+
+                    <span id="progressPercent">
+                        0%
+                    </span>
+                </div>
+
+                <div class="progress-track">
+                    <div
+                        class="progress-bar"
+                        id="progressBar"
+                    ></div>
+                </div>
+
+                <div class="progress-info">
+                    <span id="progressStatus">
+                        Preparando...
+                    </span>
+
+                    <span id="progressSpeed"></span>
+                </div>
+
+            </div>
+
+
+            <section class="received-section">
+
+                <div class="section-heading">
+                    <h2>Archivos recibidos</h2>
+                    <span id="receivedCount">0</span>
+                </div>
+
+                <div id="receivedFilesList">
+                    <div class="empty-state">
+                        Todavía no has recibido ningún archivo.
+                    </div>
+                </div>
+
+            </section>
+
+        </section>
+
+    </main>
+
+
+    <footer class="app-footer">
+        PeerDrop · Transferencia directa entre dispositivos
+    </footer>
+
+</div>
+
+
+<div class="modal-overlay hidden" id="customModal">
+
+    <div class="modal-card">
+
+        <div class="modal-header">
+            <div class="modal-icon" id="modalIcon">!</div>
+
+            <button
+                class="modal-close"
+                id="modalCancelBtn"
+            >
+                ×
+            </button>
+        </div>
+
+        <div class="modal-body">
+
+            <h3 id="modalTitle">
+                Confirmar
+            </h3>
+
+            <p id="modalMessage">
+                ¿Estás seguro?
+            </p>
+
+        </div>
+
+        <div class="modal-actions">
+
+            <button
+                class="secondary-btn"
+                id="modalConfirmBtn"
+            >
+                Confirmar
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script src="script.js"></script>
+
+</body>
+</html>
